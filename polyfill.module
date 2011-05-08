@@ -118,6 +118,7 @@ function polyfill_property_hooks() {
 function polyfill_pie($sel, &$prop) {
   $pie = 'url(/' . drupal_get_path('module', 'polyfill') . '/PIE.htc)';
   polyfill_add_rule('behavior', $pie, $prop);
+  // IE8 doesn't display statically positioned PIE elements
   if (!array_key_exists('position', $prop)) {
     polyfill_add_rule('position', 'relative', $prop);
   }
