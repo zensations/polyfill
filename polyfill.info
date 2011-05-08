@@ -1,0 +1,7 @@
+; $Id$
+name = Polyfill
+description = "Automatically apply CSS3 Polyfills."
+package = CSS
+version = 0.1
+core = 7.x
+files[] = polyfill.module

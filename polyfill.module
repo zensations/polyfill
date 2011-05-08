@@ -1,0 +1,153 @@
+<?php
+/**
+ * Implements hook_css_alter().
+ * Searches for files with .less ending in css files array
+ * and applies lessc.php and polyfills.
+ */
+function polyfill_css_alter(&$css) {
+  $path = file_default_scheme() . '://polyfill';
+  if (variable_get('preprocess_css') == 0) {
+    file_unmanaged_delete_recursive($path);
+  }
+  $files_keys = array_keys($css);
+  $files_values = array_values($css);
+  $hooks = polyfill_property_hooks();
+  foreach ($files_keys as $key => $input_file) {
+    if (drupal_substr($input_file, -5) == '.less') {
+      $css_path = $path . '/' . dirname($input_file);
+
+      if (!is_dir($css_path)) {
+        drupal_mkdir($css_path, 0777, TRUE);
+      }
+
+      $output_file = $css_path . '/' . basename($input_file, '.less');
+      if (drupal_substr($output_file, -4) != '.css') {
+        $output_file .= '.css';
+      }
+
+      if (!file_exists($output_file)) {
+        require_once('parser.php');
+        require_once('lessc.inc.php');
+        $contents = drupal_load_stylesheet($input_file, FALSE);
+        // Build the base URL of this CSS file: start with the full URL.
+        $css_base_url = file_create_url($input_file);
+        // Move to the parent.
+        $css_base_url = substr($css_base_url, 0, strrpos($css_base_url, '/'));
+        // Simplify to a relative URL if the stylesheet URL starts with the
+        // base URL of the website.
+        if (substr($css_base_url, 0, strlen($GLOBALS['base_root'])) == $GLOBALS['base_root']) {
+          $css_base_url = substr($css_base_url, strlen($GLOBALS['base_root']));
+        }
+
+        _drupal_build_css_path(NULL, $css_base_url . '/');
+        // Prefix all paths within this CSS file, ignoring external and absolute paths.
+        $contents = preg_replace_callback('/url\(\s*[\'"]?(?![a-z]+:|\/+)([^\'")]+)[\'"]?\s*\)/i', '_drupal_build_css_path', $contents);
+        $less = new lessc();  
+        $contents = $less->parse($contents);
+        $parser = new CssParser();
+        $parser->load_string($contents);
+        $parser->parse();
+        foreach ($parser->parsed as $block => $selectors) {
+          foreach ($selectors as $selector => $properties) {
+            $invokes = array();
+            foreach ($properties as $property => $rules) {
+              if (array_key_exists($property, $hooks)) {
+                foreach ($hooks[$property] as $hook) {
+                  $invokes[$hook] = TRUE;
+                }
+              }
+            }
+            foreach (array_keys($invokes) as $hook) {
+              $hook($selector, $parser->parsed[$block][$selector]);
+            }
+          }
+        }
+        $output_data = $parser->glue();
+        file_save_data($output_data, $output_file, FILE_EXISTS_REPLACE);
+      }
+
+      if (file_exists($output_file)) {
+        array_splice($files_keys, $key, 1, $output_file);
+        $files_values[$key]['data'] = $output_file;
+      }
+    }
+  }
+  $css = array_combine($files_keys, $files_values);
+}
+
+/**
+ * Adds a rule to a property and checks against redundancy.
+ * @param $p the properties name
+ * @param $v the properties value
+ * @param $prop the property array as provided to the polyfill hook
+ *   passed by reference.
+ */
+function polyfill_add_rule($p, $v, &$prop) {
+  // dont add same rules multiple times
+  if (array_key_exists($p, $prop) && in_array($v, $prop[$p])) {
+    return;
+  }
+  if (!array_key_exists($p, $prop)) {
+    $prop[$p] = array();
+  }
+  $prop[$p][] = $v;
+}
+
+/**
+ * Mapping of properties and corresponding alteration hooks.
+ * Polyfill hooks will be provided with the current selector
+ * and an array of properties their values, which is passed
+ * by reference to be alterable.
+ */
+function polyfill_property_hooks() {
+  return array(
+    'border-radius' => array('polyfill_vendor_prefix', 'polyfill_pie'),
+    'box-shadow' => array('polyfill_vendor_prefix', 'polyfill_pie'),
+    'transition' => array('polyfill_vendor_prefix'),
+    'transform' => array('polyfill_vendor_prefix'),
+    /*
+     * TODO: add background gradients and multiple background images
+     * 'background' => array(),
+     */
+  );
+}
+
+/**
+ * Adds CSSPIE behavior for CSS3 decorations in IE6-8.
+ */
+function polyfill_pie($sel, &$prop) {
+  $pie = 'url(/' . drupal_get_path('module', 'polyfill') . '/PIE.htc)';
+  polyfill_add_rule('behavior', $pie, $prop);
+  if (!array_key_exists('position', $prop)) {
+    polyfill_add_rule('position', 'relative', $prop);
+  }
+}
+
+/**
+ * Adds vendor prefixes to all properties which require them.
+ */
+function polyfill_vendor_prefix($sel, &$prop) {
+  $properties = _polyfill_vendor_properties();
+  foreach ($properties as $p) {
+    if (array_key_exists($p, $prop)) {
+      $prop['-webkit-' . $p] = $prop[$p];
+      $prop['-moz-' . $p] = $prop[$p];
+      $prop['-o-' . $p] = $prop[$p];
+    }
+  }
+}
+
+/**
+ * Helper function, gathering all properties which require
+ * vendor prefixes.
+ */
+function _polyfill_vendor_properties() {
+  $hooks = polyfill_property_hooks();
+  $properties = array();
+  foreach ($hooks as $prop => $func) {
+    if (in_array('polyfill_vendor_prefix', $func)) {
+      $properties[] = $prop;
+    }
+  }
+  return $properties;
+}
