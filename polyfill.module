@@ -1,5 +1,13 @@
 <?php
 /**
+ * Implements hook_init().
+ * Adds modernizr.min.js
+ */
+function polyfill_init() {
+  drupal_add_js(drupal_get_path('module', 'polyfill') . '/modernizr.min.js');
+}
+
+/**
  * Implements hook_css_alter().
  * Searches for files with .less ending in css files array
  * and applies lessc.php and polyfills.
