@@ -113,12 +113,93 @@ function polyfill_property_hooks() {
     'box-shadow' => array('polyfill_vendor_prefix', 'polyfill_pie'),
     'transition' => array('polyfill_vendor_prefix'),
     'transform' => array('polyfill_vendor_prefix'),
-    /*
-     * TODO: add background gradients and multiple background images
-     * 'background' => array(),
-     */
+    'background' => array('polyfill_linear_gradient'),
   );
 }
+
+/**
+ * Search for linear gradients.
+ */
+function polyfill_linear_gradient($sel, &$prop) {
+  foreach (array_keys($prop) as $p) {
+    foreach ($prop[$p] as $v) {
+      if (preg_match('/^linear-gradient\((.*)\)/', $v, $matches)) {
+        //PIE CSS
+        if ($p == 'background') {
+          polyfill_add_rule('-pie-background', $matches[0], $prop);
+          polyfill_pie($sel, $prop);
+        }
+        // Basic prefixes
+        $prefixes = array('webkit', 'moz', 'ms', 'o');
+        foreach ($prefixes as $pre) {
+          polyfill_add_rule($p, '-' . $pre . '-' . $matches[0], $prop);
+        }
+        // Webkit syntax
+        list($d, $colors) = _polyfill_parse_gradient($v);
+        $dir = array('0', '0', '0', '0');
+        $rule = '-webkit-gradient(linear, ';
+        if(preg_match('/left/', $d)) {
+            $dir[2] = '100%';
+        }
+        else if(preg_match('/right/', $d)) {
+            $dir[0] = '100%';
+        }
+        if(preg_match('/top/', $d)) {
+            $dir[3] = '100%';
+        }
+        else if(preg_match('/bottom/', $d)) {
+            $dir[1] = '100%';
+        }
+        $rule .= $dir[0] . ' ' . $dir[1] . ', ' . $dir[2] . ' ' . $dir[3];
+        foreach ($colors as  $k => $c) {
+          if ($k == 0) {
+            $rule .= ', from';
+          }
+          else if($k == (count($colors) - 1)) {
+            $rule .= ', to';
+          }
+          else {
+            $rule .= ', color-stop';
+          } 
+          if ($c['p']) {
+            $rule .= '(' . $c['p']/100 . ', ' . $c['c'] . ')';
+          }
+          else {
+            $rule .= '(' . $c['c'] . ')';
+          }
+        }
+        $rule .= ')';
+        polyfill_add_rule($p, $rule, $prop);
+      }
+    }
+  }
+}
+
+function _polyfill_parse_gradient($v) {
+  $edirection = '/(?:(?<direction>(?:top\s+|bottom\s+)?(?:right|left)|(?:right\s+|left\s+)?(?:top|bottom)))/';
+  $epercent = "(?<percent>[0-9]+)\%";
+  $ecolor = "(?<color>\#[a-zA-Z0-9]+)";
+  $ecolorstop = "/(?:$ecolor(?:\s*$epercent)?)/";
+  $directions = array();
+  $colorstops = array();
+  $colors = array();
+  preg_match_all($edirection, $v, $directions);
+  preg_match_all($ecolorstop, $v, $colorstops);
+  $direction = (count($directions['direction']) > 0) ? $directions['direction'][0] : FALSE;
+  for ($k = 0; $k < count($colorstops['color']); $k++) {
+    $colors[] = array(
+      'c' => $colorstops['color'][$k],
+      'p' => $colorstops['percent'][$k],
+    );
+  } 
+  return array($direction, $colors);
+}
+
+/**
+ * Builds gradients for Mozilla, Opera, IE and newer Webkit.
+ */
+function _polyfill_gradient($direction, $colors, &$prop) {
+} 
 
 /**
  * Adds CSSPIE behavior for CSS3 decorations in IE6-8.
