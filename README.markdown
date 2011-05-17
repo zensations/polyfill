@@ -17,7 +17,7 @@ Supported properties:
 * border-radius
 * transform *(vendor prefix only)*
 * transition *(vendor prefix only)*
-* linear-gradient *(Hex-Colors only)*
+* linear-gradient *(HEX colors only)*
 
 
 Extending

@@ -116,7 +116,6 @@ function polyfill_property_hooks() {
     'background' => array('polyfill_linear_gradient'),
   );
 }
-
 /**
  * Search for linear gradients.
  */
@@ -194,12 +193,6 @@ function _polyfill_parse_gradient($v) {
   } 
   return array($direction, $colors);
 }
-
-/**
- * Builds gradients for Mozilla, Opera, IE and newer Webkit.
- */
-function _polyfill_gradient($direction, $colors, &$prop) {
-} 
 
 /**
  * Adds CSSPIE behavior for CSS3 decorations in IE6-8.
