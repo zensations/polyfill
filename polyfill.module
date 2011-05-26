@@ -5,6 +5,7 @@
  */
 function polyfill_init() {
   drupal_add_js(drupal_get_path('module', 'polyfill') . '/modernizr.min.js');
+  drupal_add_js(drupal_get_path('module', 'polyfill') . '/flexie.min.js');
 }
 
 /**
@@ -113,9 +114,21 @@ function polyfill_property_hooks() {
     'box-shadow' => array('polyfill_vendor_prefix', 'polyfill_pie'),
     'transition' => array('polyfill_vendor_prefix'),
     'transform' => array('polyfill_vendor_prefix'),
+    /* GRADIENT */
     'background' => array('polyfill_linear_gradient'),
+    /* FLEXBOX */
+    'display' => array('polyfill_box'),
+    'box-ordinal-group' => array('polyfill_vendor_prefix'),
   );
 }
+
+function polyfill_box($sel, &$prop) {
+  if (in_array('box', $prop['display'])) {
+    $prop['display'][] = '-webkit-box';
+    $prop['display'][] = '-moz-box';
+  }
+}
+
 /**
  * Search for linear gradients.
  */
