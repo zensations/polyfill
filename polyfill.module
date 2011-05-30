@@ -5,7 +5,7 @@
  */
 function polyfill_init() {
   drupal_add_js(drupal_get_path('module', 'polyfill') . '/modernizr.min.js');
-  drupal_add_js(drupal_get_path('module', 'polyfill') . '/flexie.min.js');
+  drupal_add_js(drupal_get_path('module', 'polyfill') . '/flexie.js');
 }
 
 /**
@@ -146,8 +146,8 @@ function polyfill_linear_gradient($sel, &$prop) {
         foreach ($prefixes as $pre) {
           polyfill_add_rule($p, '-' . $pre . '-' . $matches[0], $prop);
         }
-        // Webkit syntax
         list($d, $colors) = _polyfill_parse_gradient($v);
+        // Webkit syntax
         $dir = array('0', '0', '0', '0');
         $rule = '-webkit-gradient(linear, ';
         if(preg_match('/left/', $d)) {
@@ -182,6 +182,10 @@ function polyfill_linear_gradient($sel, &$prop) {
         }
         $rule .= ')';
         polyfill_add_rule($p, $rule, $prop);
+        // IE Gradient FIXXME!
+        $rule = 'progid:DXImageTransform.Microsoft.Gradient(StartColorstr="' . $colors[0]['c'] . '", EndColorStr="' . $colors[count($colors) - 1]['c'] . '")';
+        polyfill_add_rule('filter', $rule, $prop); 
+        polyfill_add_rule('-ms-filter', $rule, $prop); 
       }
     }
   }
