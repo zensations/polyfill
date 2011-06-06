@@ -119,6 +119,7 @@ function polyfill_property_hooks() {
     /* FLEXBOX */
     'display' => array('polyfill_box'),
     'box-ordinal-group' => array('polyfill_vendor_prefix'),
+    'box-flex' => array('polyfill_vendor_prefix'),
   );
 }
 
