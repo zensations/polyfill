@@ -6,6 +6,8 @@
 function polyfill_init() {
   drupal_add_js(drupal_get_path('module', 'polyfill') . '/modernizr.min.js');
   drupal_add_js(drupal_get_path('module', 'polyfill') . '/flexie.js');
+  drupal_add_js(drupal_get_path('module', 'polyfill') . '/jquery.placeholder.min.js');
+  drupal_add_js(drupal_get_path('module', 'polyfill') . '/polyfill.js');
 }
 
 /**
