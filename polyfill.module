@@ -8,6 +8,8 @@ function polyfill_init() {
   drupal_add_js(drupal_get_path('module', 'polyfill') . '/flexie.js');
   drupal_add_js(drupal_get_path('module', 'polyfill') . '/jquery.placeholder.min.js');
   drupal_add_js(drupal_get_path('module', 'polyfill') . '/polyfill.js');
+  //drupal_add_js(drupal_get_path('module', 'polyfill') . '/sylvester.js');
+  //drupal_add_js(drupal_get_path('module', 'polyfill') . '/pb.transformie.min.js');
 }
 
 /**
@@ -138,7 +140,7 @@ function polyfill_box($sel, &$prop) {
 function polyfill_linear_gradient($sel, &$prop) {
   foreach (array_keys($prop) as $p) {
     foreach ($prop[$p] as $v) {
-      if (preg_match('/^linear-gradient\((.*)\)/', $v, $matches)) {
+      if (preg_match('/.*(linear-gradient\((.*?)\)).*$/', $v, $matches)) {
         //PIE CSS
         if ($p == 'background') {
           polyfill_add_rule('-pie-background', $matches[0], $prop);
@@ -184,6 +186,7 @@ function polyfill_linear_gradient($sel, &$prop) {
           }
         }
         $rule .= ')';
+        $rule = str_replace($matches[1], $rule, $matches[0]);
         polyfill_add_rule($p, $rule, $prop);
         // IE Gradient FIXXME!
         $rule = 'progid:DXImageTransform.Microsoft.Gradient(StartColorstr="' . $colors[0]['c'] . '", EndColorStr="' . $colors[count($colors) - 1]['c'] . '")';
