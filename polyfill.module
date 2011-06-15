@@ -218,7 +218,7 @@ function _polyfill_parse_gradient($v) {
  * Adds CSSPIE behavior for CSS3 decorations in IE6-8.
  */
 function polyfill_pie($sel, &$prop) {
-  $pie = 'url(' . url(drupal_get_path('module', 'polyfill') . '/PIE.htc') . ')';
+  $pie = 'url(' . file_create_url(drupal_get_path('module', 'polyfill') . '/PIE.htc') . ')';
   polyfill_add_rule('behavior', $pie, $prop);
   // IE8 doesn't display statically positioned PIE elements
   if (!array_key_exists('position', $prop)) {
