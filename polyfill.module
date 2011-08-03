@@ -113,7 +113,7 @@ function polyfill_add_rule($p, $v, &$prop) {
  * by reference to be alterable.
  */
 function polyfill_property_hooks() {
-  return array(
+  $hooks = array(
     'border-radius' => array('polyfill_vendor_prefix', 'polyfill_pie'),
     'box-shadow' => array('polyfill_vendor_prefix', 'polyfill_pie'),
     'transition' => array('polyfill_vendor_prefix'),
@@ -126,6 +126,8 @@ function polyfill_property_hooks() {
     'box-ordinal-group' => array('polyfill_vendor_prefix'),
     'box-flex' => array('polyfill_vendor_prefix'),
   );
+  drupal_alter('polyfill_property_hooks', $hooks);
+  return $hooks;
 }
 
 function polyfill_box($sel, &$prop) {
@@ -142,11 +144,6 @@ function polyfill_linear_gradient($sel, &$prop) {
   foreach (array_keys($prop) as $p) {
     foreach ($prop[$p] as $v) {
       if (preg_match('/.*(linear-gradient\((.*?)\)).*$/', $v, $matches)) {
-        //PIE CSS
-        if ($p == 'background') {
-          polyfill_add_rule('-pie-background', $matches[0], $prop);
-          polyfill_pie($sel, $prop);
-        }
         // Basic prefixes
         $prefixes = array('webkit', 'moz', 'ms', 'o');
         foreach ($prefixes as $pre) {
