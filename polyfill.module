@@ -4,12 +4,7 @@
  * Adds modernizr.min.js
  */
 function polyfill_init() {
-  drupal_add_js(drupal_get_path('module', 'polyfill') . '/modernizr.min.js');
-  drupal_add_js(drupal_get_path('module', 'polyfill') . '/flexie.js');
-  drupal_add_js(drupal_get_path('module', 'polyfill') . '/jquery.placeholder.min.js');
-  drupal_add_js(drupal_get_path('module', 'polyfill') . '/polyfill.js');
-  //drupal_add_js(drupal_get_path('module', 'polyfill') . '/sylvester.js');
-  //drupal_add_js(drupal_get_path('module', 'polyfill') . '/pb.transformie.min.js');
+  drupal_add_css(drupal_get_path('module', 'polyfill') . '/modernizr.js');
 }
 
 /**
@@ -24,7 +19,6 @@ function polyfill_css_alter(&$css) {
   }
   $files_keys = array_keys($css);
   $files_values = array_values($css);
-  $hooks = polyfill_property_hooks();
   foreach ($files_keys as $key => $input_file) {
     if (drupal_substr($input_file, -5) == '.less') {
       $css_path = $path . '/' . dirname($input_file);
@@ -39,8 +33,8 @@ function polyfill_css_alter(&$css) {
       }
 
       if (!file_exists($output_file)) {
-        require_once('parser.php');
-        require_once('lessc.inc.php');
+        require_once('sites/all/libraries/cssparser/CSSParser.php');
+        require_once('sites/all/libraries/lessphp/lessc.inc.php');
         $contents = drupal_load_stylesheet($input_file, FALSE);
         // Build the base URL of this CSS file: start with the full URL.
         $css_base_url = file_create_url($input_file);
@@ -57,26 +51,22 @@ function polyfill_css_alter(&$css) {
         $contents = preg_replace_callback('/url\(\s*[\'"]?(?![a-z]+:|\/+)([^\'")]+)[\'"]?\s*\)/i', '_drupal_build_css_path', $contents);
         $less = new lessc();  
         $contents = $less->parse($contents);
-        $parser = new CssParser();
-        $parser->load_string($contents);
-        $parser->parse();
-        foreach ($parser->parsed as $block => $selectors) {
-          foreach ($selectors as $selector => $properties) {
-            $invokes = array();
-            foreach ($properties as $property => $rules) {
-              if (array_key_exists($property, $hooks)) {
-                foreach ($hooks[$property] as $hook) {
-                  $invokes[$hook] = TRUE;
+        $parser = new CSSParser($contents);
+        $css = $parser->parse();
+        $processors = module_invoke_all('polyfill_processors');
+        foreach ($css->getAllDeclarationBlocks() as $block) {
+          foreach ($processors as $property => $callbacks) {
+            foreach ($block->getRules($property) as $rule) {
+              foreach ($callbacks as $callback) {
+                foreach (call_user_func($callback, $rule) as $newrule) {
+                  $block->addRule($newrule);
                 }
               }
             }
-            foreach (array_keys($invokes) as $hook) {
-              $hook($selector, $parser->parsed[$block][$selector]);
-            }
           }
         }
-        $output_data = $parser->glue();
-        file_save_data($output_data, $output_file, FILE_EXISTS_REPLACE);
+        $contents = $css->__toString();
+        file_save_data($contents, $output_file, FILE_EXISTS_REPLACE);
       }
 
       if (file_exists($output_file)) {
@@ -112,24 +102,34 @@ function polyfill_add_rule($p, $v, &$prop) {
  * and an array of properties their values, which is passed
  * by reference to be alterable.
  */
-function polyfill_property_hooks() {
-  $hooks = array(
-    'border-radius' => array('polyfill_vendor_prefix', 'polyfill_pie'),
-    'box-shadow' => array('polyfill_vendor_prefix', 'polyfill_pie'),
+function polyfill_polyfill_processors() {
+  return array(
+    'border-radius' => array('polyfill_vendor_prefix'),
+    'box-shadow' => array('polyfill_vendor_prefix'),
     'transition' => array('polyfill_vendor_prefix'),
     'transform' => array('polyfill_vendor_prefix'),
-    /* GRADIENT */
-    'background' => array('polyfill_linear_gradient'),
-    'background-image' => array('polyfill_linear_gradient'),
-    /* FLEXBOX */
-    'display' => array('polyfill_box'),
-    'box-ordinal-group' => array('polyfill_vendor_prefix'),
-    'box-flex' => array('polyfill_vendor_prefix'),
+    'border-image' => array('polyfill_vendor_prefix'),
   );
-  drupal_alter('polyfill_property_hooks', $hooks);
-  return $hooks;
 }
 
+
+/**
+ * Adds vendor prefixes to all properties which require them.
+ */
+function polyfill_vendor_prefix($rule) {
+  $prefixes = array('-webkit-', '-moz-', '-o-');
+  $new = array();
+  foreach ($prefixes as $p) {
+    $r = new CSSRule($p . $rule->getRule());
+    $r->setValue($rule->getValue());
+    $new[] = $r;
+  }
+  return $new;
+}
+
+/* ====================================================================== */
+/* UNUSED - PORT TO NEW SUBMODULES                                        */
+/* ====================================================================== */
 function polyfill_box($sel, &$prop) {
   if (in_array('box', $prop['display'])) {
     $prop['display'][] = '-webkit-box';
@@ -225,33 +225,4 @@ function polyfill_pie($sel, &$prop) {
   if (!array_key_exists('position', $prop)) {
     polyfill_add_rule('position', 'relative', $prop);
   }
-}
-
-/**
- * Adds vendor prefixes to all properties which require them.
- */
-function polyfill_vendor_prefix($sel, &$prop) {
-  $properties = _polyfill_vendor_properties();
-  foreach ($properties as $p) {
-    if (array_key_exists($p, $prop)) {
-      $prop['-webkit-' . $p] = $prop[$p];
-      $prop['-moz-' . $p] = $prop[$p];
-      $prop['-o-' . $p] = $prop[$p];
-    }
-  }
-}
-
-/**
- * Helper function, gathering all properties which require
- * vendor prefixes.
- */
-function _polyfill_vendor_properties() {
-  $hooks = polyfill_property_hooks();
-  $properties = array();
-  foreach ($hooks as $prop => $func) {
-    if (in_array('polyfill_vendor_prefix', $func)) {
-      $properties[] = $prop;
-    }
-  }
-  return $properties;
 }
