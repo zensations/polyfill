@@ -7,16 +7,20 @@ function polyfill_init() {
   drupal_add_css(drupal_get_path('module', 'polyfill') . '/modernizr.js');
 }
 
+function polyfill_flush_caches() {
+  file_unmanaged_delete_recursive(drupal_realpath(file_default_scheme() . '://polyfill', TRUE));
+}
+
 /**
  * Implements hook_css_alter().
  * Searches for files with .less ending in css files array
  * and applies lessc.php and polyfills.
  */
 function polyfill_css_alter(&$css) {
-  $path = file_default_scheme() . '://polyfill';
-  if (variable_get('preprocess_css') == 0) {
-    file_unmanaged_delete_recursive($path);
+  if (variable_get('preprocess_css') != 0) {
+    return;
   }
+  $path = file_default_scheme() . '://polyfill';
   $files_keys = array_keys($css);
   $files_values = array_values($css);
   foreach ($files_keys as $key => $input_file) {
@@ -32,7 +36,7 @@ function polyfill_css_alter(&$css) {
         $output_file .= '.css';
       }
 
-      if (!file_exists($output_file)) {
+      if (!file_exists($output_file) || ( filemtime($input_file) > filemtime($output_file) )) {
         require_once('sites/all/libraries/cssparser/CSSParser.php');
         require_once('sites/all/libraries/lessphp/lessc.inc.php');
         $contents = drupal_load_stylesheet($input_file, FALSE);
@@ -79,24 +83,6 @@ function polyfill_css_alter(&$css) {
 }
 
 /**
- * Adds a rule to a property and checks against redundancy.
- * @param $p the properties name
- * @param $v the properties value
- * @param $prop the property array as provided to the polyfill hook
- *   passed by reference.
- */
-function polyfill_add_rule($p, $v, &$prop) {
-  // dont add same rules multiple times
-  if (array_key_exists($p, $prop) && in_array($v, $prop[$p])) {
-    return;
-  }
-  if (!array_key_exists($p, $prop)) {
-    $prop[$p] = array();
-  }
-  $prop[$p][] = $v;
-}
-
-/**
  * Mapping of properties and corresponding alteration hooks.
  * Polyfill hooks will be provided with the current selector
  * and an array of properties their values, which is passed
@@ -109,6 +95,8 @@ function polyfill_polyfill_processors() {
     'transition' => array('polyfill_vendor_prefix'),
     'transform' => array('polyfill_vendor_prefix'),
     'border-image' => array('polyfill_vendor_prefix'),
+    'column-count' => array('polyfill_vendor_prefix'),
+    'column-gap' => array('polyfill_vendor_prefix'),
   );
 }
 
@@ -117,7 +105,7 @@ function polyfill_polyfill_processors() {
  * Adds vendor prefixes to all properties which require them.
  */
 function polyfill_vendor_prefix($rule) {
-  $prefixes = array('-webkit-', '-moz-', '-o-');
+  $prefixes = array('-webkit-', '-moz-', '-o-', '-ms-');
   $new = array();
   foreach ($prefixes as $p) {
     $r = new CSSRule($p . $rule->getRule());
